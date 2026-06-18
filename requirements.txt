@@ -1,0 +1,29 @@
+# Core pipeline
+pyspark==3.5.1
+
+# BigQuery connector (Spark ↔ BQ)
+# google-cloud-bigquery-storage
+# spark-bigquery-connector JAR loaded at runtime via SparkSession config
+
+# GCS
+google-cloud-storage
+
+# dbt
+dbt-bigquery
+
+# FastAPI
+fastapi
+uvicorn[standard]
+
+# BigQuery client (for FastAPI queries)
+google-cloud-bigquery
+
+# Auth
+google-auth
+
+# Testing
+pytest
+pyspark[sql]
+
+# Env management
+python-dotenv

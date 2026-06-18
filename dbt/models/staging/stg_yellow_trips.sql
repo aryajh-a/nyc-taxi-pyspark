@@ -1,0 +1,1 @@
+-- Staging model: light renaming and casting from the raw Parquet-loaded table.

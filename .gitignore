@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Env
+.env
+*.json
+
+# Spark
+derby.log
+metastore_db/
+spark-warehouse/
+
+# dbt
+dbt/target/
+dbt/logs/
+dbt/.user.yml
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data
+data/

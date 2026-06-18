@@ -1,0 +1,1 @@
+-- Mart model: daily aggregated metrics served by FastAPI.
