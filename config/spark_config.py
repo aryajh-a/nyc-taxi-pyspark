@@ -8,6 +8,9 @@ def get_spark_session():
         .appName("nyc-taxi-pyspark")\
         .config("spark.jars.packages", "com.google.cloud.spark:spark-bigquery-with-dependencies_2.12:0.36.1")\
         .config("spark.driver.host", "127.0.0.1")\
+        .config("spark.driver.bindAddress", "127.0.0.1")\
+        .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")\
+        .config("spark.driver.extraJavaOptions", "-Djava.library.path=C:/hadoop/bin")\
         .getOrCreate()
 
     return spark
