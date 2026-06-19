@@ -11,7 +11,7 @@ BigQuery Public Dataset
         ↓
 PySpark (StructType schema validation + transforms + partitioned Parquet writes)
         ↓
-GCS (date-partitioned Parquet)
+Local Parquet (date-partitioned, output/data/)
         ↓
 dbt (models + tests on BigQuery)
         ↓
@@ -25,7 +25,7 @@ FastAPI (REST endpoints serving metrics)
 | Component   | Role                                      |
 |-------------|-------------------------------------------|
 | PySpark     | Schema validation, transformation, writes |
-| GCS         | Parquet staging layer                     |
+| Local Parquet | Parquet staging layer (output/data/)    |
 | dbt         | Final transformation + testing on BQ      |
 | BigQuery    | Aggregated serving tables                 |
 | FastAPI     | REST API serving metrics                  |
@@ -44,7 +44,7 @@ nyc-taxi-pyspark/
 │   │   ├── schema.py            # StructType schema definition
 │   │   └── transforms.py        # PySpark transformation functions
 │   └── load/
-│       └── gcs_load.py          # Partitioned Parquet write to GCS
+│       └── load.py              # Partitioned Parquet write to local disk
 ├── dbt/
 │   ├── models/
 │   │   ├── staging/             # stg_yellow_trips.sql
@@ -118,15 +118,16 @@ Tasks:
 
 ---
 
-### Phase 4 — Load (`src/load/gcs_load.py`)
-**Goal:** Write the transformed DataFrame to GCS as date-partitioned Parquet.
+### Phase 4 — Load (`src/load/load.py`)
+**Goal:** Write the transformed DataFrame to local disk as date-partitioned Parquet.
 
 Tasks:
 - Write with `partitionBy("pickup_date")`
-- Use `mode("overwrite")` with partition overwrite mode for idempotency
-- Target path: `gs://<bucket>/nyc-taxi/yellow/`
+- Use `mode("overwrite")` for idempotency
+- Target path: `output/data/`
+- Validate output schema against `TRANSFORMED_SCHEMA` before writing
 
-**Exit criteria:** GCS bucket contains `pickup_date=YYYY-MM-DD/` folders with Parquet files; re-running the same date overwrites cleanly.
+**Exit criteria:** `output/data/` contains `pickup_date=YYYY-MM-DD/` folders with Parquet files; re-running overwrites cleanly.
 
 ---
 
