@@ -9,27 +9,22 @@ A data engineering portfolio project using the NYC Yellow Taxi public dataset.
 ```
 BigQuery Public Dataset
         ↓
-PySpark (StructType schema validation + transforms + partitioned Parquet writes)
+PySpark (schema validation + transforms + partitioned Parquet writes)
         ↓
 Local Parquet (date-partitioned, output/data/)
         ↓
-dbt (models + tests on BigQuery)
-        ↓
-BigQuery (clean aggregated tables)
-        ↓
-FastAPI (REST endpoints serving metrics)
+FastAPI (REST endpoints serving metrics from Parquet)
 ```
 
 ## Stack
 
-| Component   | Role                                      |
-|-------------|-------------------------------------------|
-| PySpark     | Schema validation, transformation, writes |
-| Local Parquet | Parquet staging layer (output/data/)    |
-| dbt         | Final transformation + testing on BQ      |
-| BigQuery    | Aggregated serving tables                 |
-| FastAPI     | REST API serving metrics                  |
-| Airflow     | Orchestration                             |
+| Component     | Role                                      |
+|---------------|-------------------------------------------|
+| PySpark       | Schema validation, transformation, writes |
+| Local Parquet | Date-partitioned staging layer            |
+| FastAPI       | REST API serving aggregated metrics       |
+| Pydantic      | Response model validation                 |
+| pandas        | Parquet reads inside the API layer        |
 
 ## Repo Structure
 
@@ -41,25 +36,55 @@ nyc-taxi-pyspark/
 │   ├── extract/
 │   │   └── bigquery_extract.py  # Read from BQ public dataset
 │   ├── transform/
-│   │   ├── schema.py            # StructType schema definition
+│   │   ├── schema.py            # StructType schema + column lists
 │   │   └── transforms.py        # PySpark transformation functions
 │   └── load/
-│       └── load.py              # Partitioned Parquet write to local disk
-├── dbt/
-│   ├── models/
-│   │   ├── staging/             # stg_yellow_trips.sql
-│   │   └── marts/               # agg_trips_by_date.sql
-│   └── tests/
+│       └── load.py              # Schema validation + partitioned Parquet write
 ├── api/
-│   ├── main.py                  # FastAPI app
-│   ├── routers/metrics.py       # /metrics endpoints
-│   └── schemas/trip_metrics.py  # Pydantic response models
-├── dags/
-│   └── nyc_taxi_pipeline.py     # Airflow DAG
-└── tests/
-    ├── test_extract.py
-    ├── test_transforms.py
-    └── test_load.py
+│   ├── main.py                  # FastAPI app entry point
+│   ├── routers/
+│   │   └── metrics.py           # /metrics route handlers
+│   └── schemas/
+│       └── trip_metrics.py      # Pydantic response models
+├── tests/
+│   └── test_metrics_api.py      # API endpoint tests
+└── requirements.txt
+```
+
+---
+
+## Running the ETL
+
+```bash
+python -m src.load.load
+```
+
+Output written to `output/data/pickup_date=YYYY-MM-DD/`.
+
+---
+
+## Running the API
+
+```bash
+uvicorn api.main:app --reload
+```
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/metrics/daily?pickup_date=2022-01-15` | Aggregated metrics for a single date |
+| GET | `/metrics/summary` | Trip counts and revenue across all dates |
+
+- Returns `404` if the requested date has no data
+- Swagger UI available at `http://localhost:8000/docs`
+
+---
+
+## Running Tests
+
+```bash
+pytest tests/test_metrics_api.py -v
 ```
 
 ---
@@ -74,7 +99,6 @@ Tasks:
 - Install winutils.exe, set `HADOOP_HOME`
 - Create Python 3.11 virtual environment
 - `pip install -r requirements.txt`
-- Verify: `pyspark` shell starts without errors
 
 **Exit criteria:** `pyspark` launches in the terminal, Spark UI loads at `localhost:4040`.
 
@@ -88,7 +112,7 @@ Tasks:
 - Set GCS temp bucket for BQ reads
 - Set GCP credentials path
 
-**Exit criteria:** `get_spark_session()` returns a live SparkSession; no import errors.
+**Exit criteria:** `get_spark_session()` returns a live SparkSession with no import errors.
 
 ---
 
@@ -98,23 +122,22 @@ Tasks:
 Tasks:
 - Use the SparkSession from Phase 1
 - Read `bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022`
-- Print schema and row count to confirm data loads
 
-**Exit criteria:** DataFrame with correct columns and non-zero row count printed to console.
+**Exit criteria:** DataFrame with correct columns and non-zero row count.
 
 ---
 
-### Phase 3 — Schema + Transform (`src/transform/schema.py` + `transforms.py`)
+### Phase 3 — Schema + Transform (`src/transform/`)
 **Goal:** Enforce schema at ingestion, clean and enrich the DataFrame.
 
 Tasks:
 - Define `StructType` schema matching BQ table columns
-- Apply schema to raw DataFrame (reject or flag bad rows)
-- Add derived column: `pickup_date` (cast from `tpep_pickup_datetime`)
-- Drop nulls in key columns, filter invalid fares/distances
-- Write unit tests in `tests/test_transforms.py`
+- Drop nulls in required columns, filter zero-duration trips
+- Add derived columns: `pickup_date`, `pickup_hour`, `trip_duration_minutes`
+- Aggregate per `(pickup_date, pickup_hour)`: trip count, avg fare, avg distance, total revenue
+- Round decimal columns to 2 places
 
-**Exit criteria:** Transformed DataFrame passes all unit tests; `pickup_date` column present and correctly typed.
+**Exit criteria:** Transformed DataFrame has correct columns, types, and no invalid rows.
 
 ---
 
@@ -122,53 +145,24 @@ Tasks:
 **Goal:** Write the transformed DataFrame to local disk as date-partitioned Parquet.
 
 Tasks:
-- Write with `partitionBy("pickup_date")`
-- Use `mode("overwrite")` for idempotency
-- Target path: `output/data/`
 - Validate output schema against `TRANSFORMED_SCHEMA` before writing
+- Write with `partitionBy("pickup_date")` and `mode("overwrite")`
+- Target path: `output/data/`
 
-**Exit criteria:** `output/data/` contains `pickup_date=YYYY-MM-DD/` folders with Parquet files; re-running overwrites cleanly.
-
----
-
-### Phase 5 — dbt (`dbt/`)
-**Goal:** Transform the GCS-loaded data in BigQuery using dbt models with tests.
-
-Tasks:
-- `dbt init` inside `dbt/` directory
-- Configure `profiles.yml` for BigQuery
-- Write `stg_yellow_trips.sql` staging model
-- Write `agg_trips_by_date.sql` mart model (daily trip count, avg fare, avg distance)
-- Add `not_null` and `unique` dbt tests
-- `dbt run` + `dbt test` pass
-
-**Exit criteria:** `dbt run` and `dbt test` both pass; aggregated table exists in BigQuery.
+**Exit criteria:** `output/data/` contains `pickup_date=YYYY-MM-DD/` folders with Parquet files.
 
 ---
 
-### Phase 6 — FastAPI (`api/`)
-**Goal:** REST API serving aggregated metrics from BigQuery.
+### Phase 5 — FastAPI (`api/`)
+**Goal:** REST API serving aggregated metrics read directly from local Parquet.
 
 Tasks:
-- `GET /metrics/daily` — returns daily trip stats from the mart model
-- `GET /metrics/daily/{date}` — returns stats for a specific date
+- `GET /metrics/daily?pickup_date=YYYY-MM-DD` — per-hour rows aggregated to a single daily response
+- `GET /metrics/summary` — all dates with total trips and revenue
 - Pydantic response models in `schemas/trip_metrics.py`
-- Manual test with `uvicorn` + browser/curl
+- 404 for missing dates
 
-**Exit criteria:** Both endpoints return correct JSON; Swagger UI at `/docs` works.
-
----
-
-### Phase 7 — Airflow Orchestration (`dags/nyc_taxi_pipeline.py`)
-**Goal:** Full pipeline runs end-to-end on a schedule via Airflow.
-
-Tasks:
-- Define DAG with tasks: extract → transform → load → dbt run → dbt test
-- Pass GCS URIs between tasks (XCom or task arguments)
-- Add email alerting on failure
-- Trigger DAG manually, confirm all tasks go green
-
-**Exit criteria:** Full DAG run succeeds end-to-end in Airflow UI with all tasks green.
+**Exit criteria:** Both endpoints return correct JSON; Swagger UI at `/docs` works; API tests pass.
 
 ---
 

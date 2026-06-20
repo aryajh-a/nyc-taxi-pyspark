@@ -1,4 +1,4 @@
-# Load step: writes the transformed DataFrame to GCS as date-partitioned Parquet.
+# Load step: writes the transformed DataFrame to local disk as date-partitioned Parquet.
 # Uses partitionBy("pickup_date") for query pruning and idempotent overwrites.
 from src.transform.transforms import transform
 from src.transform.schema import TRANSFORMED_SCHEMA

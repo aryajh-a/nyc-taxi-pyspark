@@ -1,5 +1,5 @@
 # PySpark transformation functions.
-# Cleans, casts, and enriches the raw taxi DataFrame before writing to GCS.
+# Cleans, casts, and enriches the raw taxi DataFrame before writing to local Parquet.
 from src.extract.bigquery_extract import read_table
 from pyspark.sql.functions import unix_timestamp, to_date, hour, filter, avg, sum, count, ceil, col
 from src.transform.schema import REQUIRED_COLUMNS, OUTPUT_COLUMNS

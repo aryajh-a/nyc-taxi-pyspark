@@ -1,4 +1,4 @@
-# Router: /metrics endpoints — queries BigQuery aggregated tables and returns JSON.
+# Router: /metrics endpoints — queries local aggregated tables and returns JSON.
 from fastapi import APIRouter, HTTPException
 from datetime import date
 from pathlib import Path
@@ -33,6 +33,7 @@ def load_all_parquet():
     
     return df
 
+# Endpoint
 @router.get("/daily", response_model=TripMetrics)
 def get_daily_metrics(pickup_date: date):
     # get data for the particular date
@@ -54,6 +55,7 @@ def get_daily_metrics(pickup_date: date):
         average_trip_duration_minutes=average_trip_duration_minutes
     )
 
+# Endpoint
 @router.get("/summary", response_model=SummaryResponse)
 def get_summary():
     # reading all files
