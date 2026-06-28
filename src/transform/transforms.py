@@ -1,7 +1,7 @@
 # PySpark transformation functions.
 # Cleans, casts, and enriches the raw taxi DataFrame before writing to local Parquet.
 from src.extract.bigquery_extract import read_table
-from pyspark.sql.functions import unix_timestamp, to_date, hour, filter, avg, sum, count, ceil, col
+from pyspark.sql.functions import unix_timestamp, to_date, hour, filter, avg, sum, count, ceil, col, round
 from src.transform.schema import REQUIRED_COLUMNS, OUTPUT_COLUMNS
 import logging
 
@@ -45,7 +45,7 @@ def transform():
 
     # 5. rounding up columns to 2 digits
     for col_name in ["average_trip_duration_minutes", "average_trip_distance", "average_fare_amount"]:
-        df_avg = df_avg.withColumn(col_name, ceil(col(col_name)*100)/100)
+        df_avg = df_avg.withColumn(col_name, round(col(col_name),2))
     logger.info("rounnded upto 2 decimal places")
 
     # Returning only the required columns
